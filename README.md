@@ -40,7 +40,7 @@
 ---
 #### 📹 Preview
 
-![Vouch Scrapper](https/i.imgur.com/0gGLwTg.png)
+![Mass Advertiser](https://i.imgur.com/0gGLwTg.png)
 
 ---
 ### ❗ Disclaimers
