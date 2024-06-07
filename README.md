@@ -53,8 +53,10 @@
 ### 📜 ChangeLog
 
 ```diff
-v0.0.1 ⋮ 4/9/2023
+v0.0.1 ⋮ 8/6/2024
 ! Initial release
+v0.0.2 ⋮ 8/6/2024
+! Improved speed, reduced rate limits, added sessions, better threading and fixed dms logic not beeing here
 ```
 
 ---
