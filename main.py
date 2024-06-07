@@ -202,6 +202,44 @@ def send_message(token, used_tokens):
             log.failure(f"Rate limited for token: {truncate_token(token)} {response.text}")
         elif response.status_code != 200 and DEBUG:
             log.failure(f"Failed to get DMs for token {truncate_token(token)}: {response.status_code} - {response.text}")
+        else:
+            dms = json.loads(response.text)
+            for dm in dms:
+                # Check if the DM is with a bot
+                if dm['recipients'][0]['bot']:
+                    continue
+
+                # Check if token has already been used to send a message to this DM
+                if dm["id"] in used_tokens:
+                    continue
+
+                req1 = requests.post(f'https://discord.com/api/v9/channels/{dm["id"]}/messages', headers=headers, json={'content': message}, proxies=proxies_dict)
+                if req1.status_code == 200 and DETAILED:
+                    log.message("Success", f"Successfully sent message to DM {dm['name']} {truncate_token(token)}")
+                elif req1.status_code == 401:
+                    log.failure(f"Invalid token: {truncate_token(token)}")
+                    with open('invalid.txt', 'a') as f:
+                        f.write(token + '\n')
+
+                    # Remove the token from the TOKEN list
+                    TOKEN.remove(token)
+
+                    # Save the updated TOKEN list to the tokens.txt file
+                    with open('tokens.txt', 'w') as f:
+                        for token in TOKEN:
+                            f.write(token + '\n')
+                    return
+                elif req1.status_code == 429:
+                    log.failure(f"Rate limited for token: {truncate_token(token)} {req1.text}")
+                elif req1.status_code == 403 and "captcha" in req1.text and DETAILED:
+                    log.failure(f"Captcha required for token: {truncate_token(token)}")
+                elif req1.status_code == 403:
+                    log.failure(f"Missing access/perms for token: {truncate_token(token)} in DM {dm['name']}")
+                elif req1.status_code != 200 and DEBUG:
+                    log.failure(f"Failed to send message to DM {dm['name']} - {dm['id']} for token {truncate_token(token)}: {req1.status_code} - {req1.text}")
+
+                # Mark token as used for this DM
+                used_tokens.add(dm["id"])
 
     except Exception as e:
         if DEBUG:
