@@ -129,7 +129,7 @@ def send_message(token, used_tokens):
                     f.write(token + '\n')
             return
         elif response.status_code == 429:
-            log.failure(f"Rate limited for token: {truncate_token(token)}")
+            log.failure(f"Rate limited for token: {truncate_token(token)} {response.text}")
         elif response.status_code != 200 and DEBUG:
             log.failure(f"Failed to get guilds for token {truncate_token(token)}: {response.status_code} - {response.text}")
 
@@ -169,7 +169,7 @@ def send_message(token, used_tokens):
                                 f.write(token + '\n')
                         return
                     elif req1.status_code == 429:
-                        log.failure(f"Rate limited for token: {truncate_token(token)}")
+                        log.failure(f"Rate limited for token: {truncate_token(token)} {req1.text}")
 
                     elif req1.status_code == 403 and "captcha" in req1.text and DETAILED:
                         log.failure(f"Captcha required for token: {truncate_token(token)}")
@@ -199,7 +199,7 @@ def send_message(token, used_tokens):
                     f.write(token + '\n')
             return
         elif response.status_code == 429:
-            log.failure(f"Rate limited for token: {truncate_token(token)}")
+            log.failure(f"Rate limited for token: {truncate_token(token)} {response.text}")
         elif response.status_code != 200 and DEBUG:
             log.failure(f"Failed to get DMs for token {truncate_token(token)}: {response.status_code} - {response.text}")
 
