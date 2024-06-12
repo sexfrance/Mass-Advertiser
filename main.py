@@ -6,11 +6,13 @@ from datetime import datetime
 import getpass
 import random
 import os
+import time
 import threading
 from concurrent.futures import ThreadPoolExecutor
+import webbrowser
 
 TOKEN = ''  # For single advertising
-DEBUG = False  # If the messages somehow do not send, set this to true to see more detailed errors and more informations
+DEBUG = True  # If the messages somehow do not send, set this to true to see more detailed errors and more informations
 DETAILED = True  # Leave it on True if you want to use it as a tool, It will just print in the console success/failed/captcha tokens
 
 if TOKEN == '' or None:
@@ -51,6 +53,13 @@ class Logger:
             print(f"{self.prefix}[{self.MAGENTAA}{time}] {self.PINK}[{self.CYAN}{level}{self.PINK}] -> {Fore.RESET} {self.CYAN}{message}{Fore.RESET} [{Fore.CYAN}{end - start}s{Style.RESET_ALL}]")
         else:
             print(f"{self.prefix}[{self.MAGENTAA}{time}] {self.PINK}[{Fore.BLUE}{level}{self.PINK}] -> {Fore.RESET} {self.CYAN}{message}{Fore.RESET}")
+    
+    def message2(self, level: str, message: str, start: int = None, end: int = None) -> None:
+        time = self.get_time()
+        if start is not None and end is not None:
+            print(f"{self.prefix}[{self.MAGENTAA}{time}] {self.PINK}[{self.CYAN}{level}{self.PINK}] -> {Fore.RESET} {self.CYAN}{message}{Fore.RESET} [{Fore.CYAN}{end - start}s{Style.RESET_ALL}]", end="\r")
+        else:
+            print(f"{self.prefix}[{self.MAGENTAA}{time}] {self.PINK}[{Fore.BLUE}{level}{self.PINK}] -> {Fore.RESET} {self.CYAN}{message}{Fore.RESET}", end="\r")
 
     def question(self, message: str, start: int = None, end: int = None) -> None:
         time = self.get_time()
@@ -93,6 +102,61 @@ home()
 with open('proxies.txt', 'r') as f:
     proxies = [line.strip() for line in f.readlines()]
 
+if not proxies:
+    seconds = 5
+    log.message("Error", "No proxies found in proxies.txt")
+
+    while seconds > -1:
+        time.sleep(1)
+        log.message2("Info", f"Redirecting to the proxy provider website in {seconds} seconds")
+        seconds -= 1
+        
+
+    webbrowser.open_new_tab("https://nitroseller0.mysellix.io/fr/product/sticky-residential-proxies-0-3-gb")
+    input(Fore.BLUE + "Press any key to exit..." + Fore.RESET)
+    exit()
+
+# ------------------------------ SCRIPT BELOW NOT WORKING UNDER CONSTRUCTION ------------------------------ #
+
+# def test_proxy(proxy):
+#     try:
+#         response = requests.get('https://httpbin.org/ip', proxies={'http': proxy, 'https': proxy}, timeout=5)
+#         if response.status_code == 200:
+#             return True
+#         else:
+#             return False
+#     except requests.exceptions.RequestException:
+#         return False
+    
+# invalid_proxies = []
+# format_issues = []
+# http_issues = []
+# for proxy in proxies:
+#     if not proxy.split("@")[-1].split(":")[-1].isdigit() or ":" not in proxy or "@" not in proxy:
+#         format_issues.append(proxy)
+#         invalid_proxies.append(proxy)
+#     elif not test_proxy(proxy):
+#         http_issues.append(proxy)
+#         invalid_proxies.append(proxy)
+
+#     if format_issues:
+#         log.message("Error", f"Invalid proxy format for the following proxies: {', '.join(format_issues)}")
+#         log.message("Info", "The correct proxy format is user:pass@ip:port")
+
+#     if http_issues:
+#         log.message("Error", f"Request issue for the following proxies: {', '.join(http_issues)}")
+#         log.message("Info", "The problem might be that the proxy is not working or the website is blocking the proxy. You can try using a different proxy or website.")
+
+#     if invalid_proxies:
+#         log.message("Info", f"Removed {len(invalid_proxies)} invalid proxies from the list")
+#         proxies = [p for p in proxies if p not in invalid_proxies]
+
+#     input(Fore.BLUE + "Press any key to exit..." + Fore.RESET)
+#     exit()
+
+# ------------------------------ SCRIPT ABOVE NOT WORKING UNDER CONSTRUCTION ------------------------------ #
+
+
 # Ask user for message
 message = log.question(f"Enter the message you want to send: ")
 try:
@@ -131,6 +195,7 @@ def send_message(token, used_tokens):
             log.failure(f"Rate limited for token: {truncate_token(token)} {response.text}")
         elif response.status_code != 200 and DEBUG:
             log.failure(f"Failed to get guilds for token {truncate_token(token)}: {response.status_code} - {response.text}")
+            
 
         guilds = json.loads(response.text)
 
@@ -143,13 +208,17 @@ def send_message(token, used_tokens):
             channels = json.loads(response.text)
             if DEBUG:
                 log.info(f"Got guild {guild['name']} - {guild['id']}")
+                
             for channel in channels:
                 if DEBUG:
                     log.info(f"Got channel {channel['name']} - {channel['id']} in {guild['name']} - {guild['id']}")
+                
                 if channel['type'] == 0:  # Text channel
                     if (channel["id"], guild["id"]) in used_tokens:
                         continue
+                    
                     req1 = session.post(f'https://discord.com/api/v9/channels/{channel["id"]}/messages', headers=headers, json={'content': message})
+                 
                     if req1.status_code == 200 and DETAILED:
                         log.message("Success", f"Successfully sent message to {channel['name']} in {guild['name']} {truncate_token(token)}")
                     elif req1.status_code == 401:
@@ -219,6 +288,13 @@ def send_message(token, used_tokens):
     except Exception as e:
         if DEBUG:
             print(e)
+    
+    except requests.exceptions.ProxyError as e:
+        if DEBUG:
+            log.failure(f"Proxy error: {e}")
+        proxies.remove(proxy)
+        return
+
 
 used_tokens = set()
 
