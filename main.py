@@ -6,14 +6,18 @@ from datetime import datetime
 import getpass
 import random
 import os
-import time
-import threading
 from concurrent.futures import ThreadPoolExecutor
 import webbrowser
+from itertools import cycle
+from shutil import get_terminal_size
+from threading import Thread
+from time import sleep
+
 
 TOKEN = ''  # For single advertising
-DEBUG = True  # If the messages somehow do not send, set this to true to see more detailed errors and more informations
+DEBUG = False  # If the messages somehow do not send, set this to true to see more detailed errors and more informations
 DETAILED = True  # Leave it on True if you want to use it as a tool, It will just print in the console success/failed/captcha tokens
+PROXY_CHECKER = True # Leave it on True, it will check all of your proxies for errors and remove them if there are some.
 
 if TOKEN == '' or None:
     with open('tokens.txt', 'r') as f:
@@ -70,6 +74,42 @@ class Logger:
         time = self.get_time()
         print(f"{self.prefix}[{self.MAGENTAA}{time}] {Fore.RESET} {self.PINK}[{Fore.BLUE}!{self.PINK}] -> {Fore.RESET} {self.CYAN}{message}{Fore.RESET}")
 
+class Loader:
+    def __init__(self, desc="Loading...", end="\r", timeout=0.1):
+        self.desc = desc
+        self.end = end
+        self.timeout = timeout
+        self.time = datetime.now().strftime("%H:%M:%S")
+
+        self._thread = Thread(target=self._animate, daemon=True)
+        self.steps = ["⢿", "⣻", "⣽", "⣾", "⣷", "⣯", "⣟", "⡿"]
+        self.done = False
+
+    def start(self):
+        self._thread.start()
+        return self
+    log = Logger()
+    def _animate(self):
+        for c in cycle(self.steps):
+            if self.done:
+                break
+            print(f"\r{log.PINK}[{log.MAGENTA}.gg/bestnitro{log.PINK}] {log.MAGENTAA}{self.time}] {log.PINK}[{Fore.BLUE}Checker{log.PINK}] -> {Fore.RESET} {log.GREEN}{self.desc}{Fore.RESET} {c}", flush=True, end="")
+            sleep(self.timeout)
+
+    def __enter__(self):
+        self.start()
+    
+
+    def stop(self):
+        self.done = True
+        cols = get_terminal_size((80, 20)).columns
+        print("\r" + " " * cols, end="", flush=True)
+        print(f"\r{self.end}", flush=True)
+
+    def __exit__(self, exc_type, exc_value, tb):
+        # handle exceptions with those variables ^
+        self.stop()
+
 def truncate_token(token, max_length=10):
     if len(token) > max_length:
         return token[:max_length] + '...'
@@ -97,17 +137,16 @@ def home():
 
 log = Logger()
 home()
-
 # Read proxies from file
 with open('proxies.txt', 'r') as f:
     proxies = [line.strip() for line in f.readlines()]
 
 if not proxies:
     seconds = 5
-    log.message("Error", "No proxies found in proxies.txt")
+    log.message("Error", f"No proxies found in proxies.txt")
 
     while seconds > -1:
-        time.sleep(1)
+        sleep(1)
         log.message2("Info", f"Redirecting to the proxy provider website in {seconds} seconds")
         seconds -= 1
         
@@ -116,46 +155,59 @@ if not proxies:
     input(Fore.BLUE + "Press any key to exit..." + Fore.RESET)
     exit()
 
-# ------------------------------ SCRIPT BELOW NOT WORKING UNDER CONSTRUCTION ------------------------------ #
+# ------------------------------ SCRIPT BELOW WORKING BUT UNDER CONSTRUCTION ------------------------------ #
+checking = False
 
-# def test_proxy(proxy):
-#     try:
-#         response = requests.get('https://httpbin.org/ip', proxies={'http': proxy, 'https': proxy}, timeout=5)
-#         if response.status_code == 200:
-#             return True
-#         else:
-#             return False
-#     except requests.exceptions.RequestException:
-#         return False
+def test_proxy(proxy):
+    try:
+        response = requests.get('https://httpbin.org/ip', proxies={'http': "http://" + proxy, 'https': "http://" + proxy}, timeout=5)
+        if response.status_code == 200:
+            return True
+        else:
+            return False
+    except requests.exceptions.RequestException as e:
+        if DEBUG:
+            log.failure(f'Error {e} for proxy: {proxy}')
+        return False
+
+def exit_message():  
+    input(Fore.BLUE + "Press any key to exit..." + Fore.RESET)
+    exit()
+
+def check_proxies(proxies):
+    format_issues = []
+    http_issues = []
+    valid_proxies = []
     
-# invalid_proxies = []
-# format_issues = []
-# http_issues = []
-# for proxy in proxies:
-#     if not proxy.split("@")[-1].split(":")[-1].isdigit() or ":" not in proxy or "@" not in proxy:
-#         format_issues.append(proxy)
-#         invalid_proxies.append(proxy)
-#     elif not test_proxy(proxy):
-#         http_issues.append(proxy)
-#         invalid_proxies.append(proxy)
+    with Loader(f"Checking Proxies..."):
+        for proxy in proxies:
+            if not proxy.split("@")[-1].split(":")[-1].isdigit() or ":" not in proxy or "@" not in proxy:
+                format_issues.append(proxy)
+            elif not test_proxy(proxy):
+                http_issues.append(proxy)
+            else:
+                valid_proxies.append(proxy)
 
-#     if format_issues:
-#         log.message("Error", f"Invalid proxy format for the following proxies: {', '.join(format_issues)}")
-#         log.message("Info", "The correct proxy format is user:pass@ip:port")
+    if format_issues:
+        log.message(f"Error", f"Invalid proxy format for the following proxies: {', '.join(format_issues)}")
+        log.message("Info", "The correct proxy format is user:pass@ip:port")
 
-#     if http_issues:
-#         log.message("Error", f"Request issue for the following proxies: {', '.join(http_issues)}")
-#         log.message("Info", "The problem might be that the proxy is not working or the website is blocking the proxy. You can try using a different proxy or website.")
+    if http_issues:
+        log.message("Error", f"Request issue for the following proxies: {', '.join(http_issues)}")
+        log.message("Info", "The problem might be that the proxy is not working. You can try using a different proxy or buying more bandwith if you use a bandwith subscription proxy.")
+        
+    
+    with open('proxies.txt', 'w') as f:
+        for proxy in valid_proxies:
+            f.write(proxy + '\n')
+    
+    if format_issues or http_issues:
+        exit_message()
 
-#     if invalid_proxies:
-#         log.message("Info", f"Removed {len(invalid_proxies)} invalid proxies from the list")
-#         proxies = [p for p in proxies if p not in invalid_proxies]
+if PROXY_CHECKER:
+    check_proxies(proxies)
 
-#     input(Fore.BLUE + "Press any key to exit..." + Fore.RESET)
-#     exit()
-
-# ------------------------------ SCRIPT ABOVE NOT WORKING UNDER CONSTRUCTION ------------------------------ #
-
+# ------------------------------ SCRIPT ABOVE WORKING BUT UNDER CONSTRUCTION ------------------------------ #
 
 # Ask user for message
 message = log.question(f"Enter the message you want to send: ")
@@ -288,13 +340,6 @@ def send_message(token, used_tokens):
     except Exception as e:
         if DEBUG:
             print(e)
-    
-    except requests.exceptions.ProxyError as e:
-        if DEBUG:
-            log.failure(f"Proxy error: {e}")
-        proxies.remove(proxy)
-        return
-
 
 used_tokens = set()
 
