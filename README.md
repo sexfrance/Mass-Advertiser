@@ -5,7 +5,7 @@
     Python Script that allows you to advertise using your discord tokens, they will send your custom message in every guild and channel you have access to (needs send message perms) and every people in your dm list.
     <br />
     <br />
-    <a href="https://discord.gg/bestnitro">💬 Discord</a>
+    <a href="https://discord.cyberious.xyz">💬 Discord</a>
     ·
     <a href="https://github.com/sexfrance/Mass-Advertiser#-changelog">📜 ChangeLog</a>
     ·
