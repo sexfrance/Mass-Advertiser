@@ -26,7 +26,7 @@ else:
     TOKEN = TOKEN
 
 class Logger:
-    def __init__(self, prefix: str = ".gg/bestnitro"):
+    def __init__(self, prefix: str = "discord.cyberious.xyz"):
         self.WHITE = "\u001b[37m"
         self.MAGENTA = "\033[38;5;97m"
         self.MAGENTAA = "\033[38;2;157;38;255m"
@@ -93,7 +93,7 @@ class Loader:
         for c in cycle(self.steps):
             if self.done:
                 break
-            print(f"\r{log.PINK}[{log.MAGENTA}.gg/bestnitro{log.PINK}] {log.MAGENTAA}{self.time}] {log.PINK}[{Fore.BLUE}Checker{log.PINK}] -> {Fore.RESET} {log.GREEN}{self.desc}{Fore.RESET} {c}", flush=True, end="")
+            print(f"\r{log.PINK}[{log.MAGENTA}discord.cyberious.xyz{log.PINK}] {log.MAGENTAA}{self.time}] {log.PINK}[{Fore.BLUE}Checker{log.PINK}] -> {Fore.RESET} {log.GREEN}{self.desc}{Fore.RESET} {c}", flush=True, end="")
             sleep(self.timeout)
 
     def __enter__(self):
